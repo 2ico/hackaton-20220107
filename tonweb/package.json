@@ -1,8 +1,10 @@
 {
-  "name": "ton-payment-channels-example",
+  "name": "tonweb-test",
   "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "tonweb": "^0.0.50"
-  }
+    "tonweb": "^0.0.50",
+    "dotenv": "^16.0.1"
+  },
+  "license": "MIT"
 }

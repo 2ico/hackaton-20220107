@@ -18,7 +18,7 @@ const toNano = TonWeb.utils.toNano;
 
 const init = async () => {
     const providerUrl = 'https://testnet.toncenter.com/api/v2/jsonRPC'; // TON HTTP API url. Use this url for testnet
-    const apiKey = process.env.TON_API; // Obtain your API key in https://t.me/tontestnetapibot
+    const apiKey = ''; // Obtain your API key in https://t.me/tontestnetapibot
     const tonweb = new TonWeb(new TonWeb.HttpProvider(providerUrl, {apiKey})); // Initialize TON SDK
 
     //----------------------------------------------------------------------
@@ -70,8 +70,8 @@ const init = async () => {
     // They share this information off-chain, for example via a websocket.
 
     const channelInitState = {
-        balanceA: toNano('0.1'), // A's initial balance in Toncoins. Next A will need to make a top-up for this amount
-        balanceB: toNano('0.'), // B's initial balance in Toncoins. Next B will need to make a top-up for this amount
+        balanceA: toNano('1'), // A's initial balance in Toncoins. Next A will need to make a top-up for this amount
+        balanceB: toNano('2'), // B's initial balance in Toncoins. Next B will need to make a top-up for this amount
         seqnoA: new BN(0), // initially 0
         seqnoB: new BN(0)  // initially 0
     };
@@ -166,16 +166,21 @@ const init = async () => {
 
     await fromWalletA.init(channelInitState).send(toNano('0.05'));
 
-    // to check, call the get method - `state` should change to `TonWeb.payments.PaymentChannel.STATE_OPEN`
+}
+
+const step = async (amount) => {
+      // to check, call the get method - `state` should change to `TonWeb.payments.PaymentChannel.STATE_OPEN`
 
     //----------------------------------------------------------------------
     // FIRST OFFCHAIN TRANSFER - A sends 0.1 TON to B
 
     // A creates new state - subtracts 0.1 from A's balance, adds 0.1 to B's balance, increases A's seqno by 1
 
+    const data = await channelA.getData();
+
     const channelState1 = {
-        balanceA: toNano('0.9'),
-        balanceB: toNano('2.1'),
+        balanceA: data.balanceA - amount,
+        balanceB: data.balanceB + amount,
         seqnoA: new BN(1),
         seqnoB: new BN(0)
     };
@@ -190,60 +195,11 @@ const init = async () => {
         throw new Error('Invalid A signature');
     }
     const signatureB1 = await channelB.signState(channelState1);
+}
 
-    //----------------------------------------------------------------------
-    // SECOND OFFCHAIN TRANSFER - A sends 0.2 TON to B
 
-    // A creates new state - subtracts 0.2 from A's balance, adds 0.2 to B's balance, increases A's seqno by 1
-
-    const channelState2 = {
-        balanceA: toNano('0.7'),
-        balanceB: toNano('2.3'),
-        seqnoA: new BN(2),
-        seqnoB: new BN(0)
-    };
-
-    // A signs this state and send signed state to B (e.g. via websocket)
-
-    const signatureA2 = await channelA.signState(channelState2);
-
-    // B checks that the state is changed according to the rules, signs this state, send signed state to A (e.g. via websocket)
-
-    if (!(await channelB.verifyState(channelState2, signatureA2))) {
-        throw new Error('Invalid A signature');
-    }
-    const signatureB2 = await channelB.signState(channelState2);
-
-    //----------------------------------------------------------------------
-    // THIRD OFFCHAIN TRANSFER - B sends 1.1 TON TO A
-
-    // B creates new state - subtracts 1.1 from B's balance, adds 1.1 to A's balance, increases B's seqno by 1
-
-    const channelState3 = {
-        balanceA: toNano('1.8'),
-        balanceB: toNano('1.2'),
-        seqnoA: new BN(2),
-        seqnoB: new BN(1)
-    };
-
-    // B signs this state and send signed state to A (e.g. via websocket)
-
-    const signatureB3 = await channelB.signState(channelState3);
-
-    // A checks that the state is changed according to the rules, signs this state, send signed state to B (e.g. via websocket)
-
-    if (!(await channelA.verifyState(channelState3, signatureB3))) {
-        throw new Error('Invalid B signature');
-    }
-    const signatureA3 = await channelA.signState(channelState3);
-
-    //----------------------------------------------------------------------
-    // So they can do this endlessly.
-    // Note that a party can make its transfers (from itself to another) asynchronously without waiting for the action of the other side.
-    // Party must increase its seqno by 1 for each of its transfers and indicate the last seqno and balance of the other party that it knows.
-
-    //----------------------------------------------------------------------
-    // CLOSE PAYMENT CHANNEL
+const close = async () => {
+     // CLOSE PAYMENT CHANNEL
 
     // The parties decide to end the transfer session.
     // If one of the parties disagrees or is not available, then the payment channel can be emergency terminated using the last signed state.
@@ -263,7 +219,6 @@ const init = async () => {
         throw new Error('Invalid B signature');
     }
 
-    
     await fromWalletA.close({
         ...channelState3,
         hisSignature: signatureCloseB
@@ -271,3 +226,5 @@ const init = async () => {
 }
 
 init();
+step();
+close();
